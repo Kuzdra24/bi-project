@@ -1,0 +1,49 @@
+{
+ "teryt": [
+  "0264"
+ ],
+ "zrodlo": "Geofabrik (.osm.pbf)",
+ "stan_danych_osm": "2026-11-08T21:21:00Z",
+ "obiekty_wiersze": 10838,
+ "obiekty_unikalne_osm": 8823,
+ "brak_wspolrzednych": 0,
+ "obiekty_w_kilku_kategoriach": 4030,
+ "komunikacja_wiersze": 5996,
+ "komunikacja_unikalne_obiekty_osm": 3991,
+ "komunikacja_przystanki_po_dedup(nazwa+100m)": 1582,
+ "komunikacja_bez_nazwy": 22,
+ "ostatnia_edycja_lata_kwantyle": {
+  "0.25": 1.1,
+  "0.5": 2.6,
+  "0.75": 5.1,
+  "0.9": 7.9
+ },
+ "edycja_starsza_niz_5_lat_pct": 25.7,
+ "test_laczenia_rcn": {
+  "punkty_rcn(unikalne budynki)": 4420,
+  "przystanek (dowolny)": {
+   "mediana_odl_m": 186,
+   "p90_odl_m": 1039,
+   "pct_w_500m": 81.7,
+   "mediana_liczby_w_500m": 20.0
+  },
+  "park": {
+   "mediana_odl_m": 368,
+   "p90_odl_m": 1517,
+   "pct_w_500m": 62.2,
+   "mediana_liczby_w_500m": 1.0
+  },
+  "sklep_spozywczy": {
+   "mediana_odl_m": 213,
+   "p90_odl_m": 1525,
+   "pct_w_500m": 74.3,
+   "mediana_liczby_w_500m": 5.0
+  },
+  "szkola": {
+   "mediana_odl_m": 430,
+   "p90_odl_m": 1911,
+   "pct_w_500m": 56.4,
+   "mediana_liczby_w_500m": 1.0
+  }
+ }
+}

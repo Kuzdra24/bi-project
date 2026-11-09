@@ -226,3 +226,16 @@ Kod (skrypty + notebooki) zostaje w repozytorium jako dowód, że liczby są pow
 1. **Które miasto?** Kryteria: miasto na prawach powiatu (jeden TERYT w RCN), duży wolumen ofert. Kandydaci: Warszawa, Kraków, Wrocław, Poznań, Gdańsk, Łódź.
 2. **Regulamin portalu:** kto z grupy go sprawdza i co robimy, jeśli scraping jest zabroniony (inny portal czy gotowy zbiór)?
 3. **Historia ofert:** akceptujemy, że oferty to tylko bieżący stan (porównanie z ostatnimi miesiącami RCN), czy szukamy dodatkowo zbioru historycznego?
+
+---
+
+## Zmiany względem planu (9.11.2026)
+
+| Plan | Realizacja | Powód |
+|---|---|---|
+| Jedno miasto – do wskazania | **Wrocław (TERYT 0264)**; zakres sterowany tylko kodami TERYT w `config.py` | decyzja grupy; kod ma działać dla całej Polski |
+| Okno: ostatnie ~2 lata (XI 2024 – XI 2026) | **VIII 2023 – VI 2024** | jedyne legalnie dostępne dane ofertowe (Kaggle) obejmują ten okres |
+| Oferty: scraping portalu | **Kaggle „Apartment Prices in Poland” (Apache 2.0)** | regulaminy Otodom, Gratki, Nieruchomości-online i Adresowo zakazują automatycznego pobierania (szczegóły: `reports/RAPORT.md`, R1) |
+| OSM: Overpass API | **plik `.osm.pbf` z Geofabrik** (Overpass zostaje jako opcja w skrypcie) | Overpass przeciążony (HTTP 502), serwer zaleca własną instancję do automatycznego użycia |
+| RCN: próbka kilkaset–kilka tysięcy rekordów | **pełne okno dla Wrocławia** (18 134 lokale, ok. 54 MB) | mała, nielosowa próbka (150 / miesiąc) dawała tylko 25 porównywalnych komórek siatki; pełne okno daje 86 |
+| Wynik: `reports/RAPORT.md` + wykresy | zgodnie z planem: raport R1–R7 + 14 wykresów | – |

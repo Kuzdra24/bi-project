@@ -1,0 +1,68 @@
+{
+ "rcn_rekordy_po_czyszczeniu": 13552,
+ "oferty_wiersze": 20200,
+ "okno": [
+  "2023-08-01",
+  "2024-06-30"
+ ],
+ "miesiace_rcn": 11,
+ "miesiace_ofert": 11,
+ "miesiace_wspolne": 11,
+ "nbp_pokrycie_miesiecy_rcn_pct": 100.0,
+ "nbp_pokrycie_miesiecy_ofert_pct": 100.0,
+ "teryt_rcn": [
+  "0264"
+ ],
+ "teryt_oferty": [
+  "0264"
+ ],
+ "komorki_1km_z_transakcjami": 196,
+ "komorki_1km_z_ofertami": 206,
+ "komorki_1km_porownywalne(>= 10 po obu stronach)": 86,
+ "oferty_w_porownywalnych_komorkach_pct": 74.8,
+ "miasto_mediana_transakcja": 10912,
+ "miasto_mediana_oferta": 12414,
+ "miasto_luka_pct": 13.8,
+ "luka_wg_powierzchni": {
+  "<38": {
+   "transakcja_mediana": 12432.1,
+   "oferta_mediana": 14659.5,
+   "luka_pct": 17.9,
+   "n_trans": 2400,
+   "n_ofert": 2412
+  },
+  "38–50": {
+   "transakcja_mediana": 11156.2,
+   "oferta_mediana": 13000.0,
+   "luka_pct": 16.5,
+   "n_trans": 4391,
+   "n_ofert": 4925
+  },
+  "50–65": {
+   "transakcja_mediana": 10500.8,
+   "oferta_mediana": 12123.4,
+   "luka_pct": 15.5,
+   "n_trans": 3940,
+   "n_ofert": 6730
+  },
+  "65–80": {
+   "transakcja_mediana": 10146.7,
+   "oferta_mediana": 11444.4,
+   "luka_pct": 12.8,
+   "n_trans": 1594,
+   "n_ofert": 3420
+  },
+  "80+": {
+   "transakcja_mediana": 9466.0,
+   "oferta_mediana": 10831.3,
+   "luka_pct": 14.4,
+   "n_trans": 1227,
+   "n_ofert": 2713
+  }
+ },
+ "luka_komorki_1km_kwantyle": {
+  "0.1": -5.7,
+  "0.5": 10.1,
+  "0.9": 34.8
+ }
+}

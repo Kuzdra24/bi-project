@@ -1,0 +1,164 @@
+{
+ "pliki_sprzedaz": 11,
+ "wiersze_cala_PL": 195568,
+ "kolumny": [
+  "id",
+  "city",
+  "type",
+  "squareMeters",
+  "rooms",
+  "floor",
+  "floorCount",
+  "buildYear",
+  "latitude",
+  "longitude",
+  "centreDistance",
+  "poiCount",
+  "schoolDistance",
+  "clinicDistance",
+  "postOfficeDistance",
+  "kindergartenDistance",
+  "restaurantDistance",
+  "collegeDistance",
+  "pharmacyDistance",
+  "ownership",
+  "buildingMaterial",
+  "condition",
+  "hasParkingSpace",
+  "hasBalcony",
+  "hasElevator",
+  "hasSecurity",
+  "hasStorageRoom",
+  "price"
+ ],
+ "snapshoty": [
+  "2023-08",
+  "2024-06"
+ ],
+ "miasta": {
+  "warszawa": 59246,
+  "krakow": 29026,
+  "wroclaw": 20200,
+  "gdansk": 19210,
+  "lodz": 15300,
+  "bydgoszcz": 9547,
+  "gdynia": 8164,
+  "poznan": 7705,
+  "szczecin": 6331,
+  "lublin": 5704,
+  "katowice": 5284,
+  "radom": 2929,
+  "czestochowa": 2657,
+  "bialystok": 2464,
+  "rzeszow": 1801
+ },
+ "braki_pct_cala_PL": {
+  "condition": 74.8,
+  "buildingMaterial": 39.6,
+  "type": 21.6,
+  "floor": 17.7,
+  "buildYear": 16.5,
+  "hasElevator": 5.0,
+  "collegeDistance": 2.8,
+  "floorCount": 1.2,
+  "clinicDistance": 0.4,
+  "restaurantDistance": 0.2,
+  "schoolDistance": 0.1,
+  "postOfficeDistance": 0.1,
+  "kindergartenDistance": 0.1,
+  "pharmacyDistance": 0.1
+ },
+ "id_unikalne_cala_PL": 92967,
+ "duplikaty_id_w_tym_samym_snapshocie": 0,
+ "obszar": {
+  "teryt": [
+   "0264"
+  ],
+  "wiersze": 20200,
+  "unikalne_id": 9598,
+  "oferty_na_snapshot": {
+   "2023-08": 1768,
+   "2023-09": 1542,
+   "2023-10": 1657,
+   "2023-11": 1645,
+   "2023-12": 1686,
+   "2024-01": 1739,
+   "2024-02": 1681,
+   "2024-03": 1836,
+   "2024-04": 2062,
+   "2024-05": 2313,
+   "2024-06": 2271
+  },
+  "braki_pct": {
+   "condition": 72.5,
+   "buildingMaterial": 38.5,
+   "type": 17.9,
+   "floor": 16.7,
+   "buildYear": 13.3,
+   "hasElevator": 4.3,
+   "floorCount": 0.9,
+   "clinicDistance": 0.6,
+   "collegeDistance": 0.5,
+   "pharmacyDistance": 0.1,
+   "restaurantDistance": 0.1
+  },
+  "ile_migawek_na_oferte": {
+   "1": 4936,
+   "2": 2136,
+   "3": 1141,
+   "4": 590,
+   "5": 286,
+   "6": 214,
+   "7": 108,
+   "8": 71,
+   "9": 38,
+   "10": 29,
+   "11": 49
+  },
+  "oferty_ze_zmiana_ceny_pct": 14.1,
+  "mediana_zmiany_ceny_pct(min->max)": 3.9,
+  "podejrzane_duplikaty_inne_id(te_same_wsp_pow_pietro_cena)": 264,
+  "podejrzane_duplikaty_inne_id(bez_ceny)": 378,
+  "pow_poza_[15,250]": 0,
+  "cena_m2_poza_[3000,50000]": 0,
+  "pietro_wieksze_niz_liczba_pieter": 0,
+  "rok_budowy_poza_[1850,2030]": 0,
+  "rok_budowy_po_roku_migawki(rynek_pierwotny?)_pct": 2.5,
+  "wspolrzedne_powtarzalne(top5)": [
+   168,
+   155,
+   118,
+   102,
+   100
+  ],
+  "cena_m2_kwantyle": {
+   "0.01": 8373.0,
+   "0.25": 10907.0,
+   "0.5": 12414.0,
+   "0.75": 14342.0,
+   "0.99": 21429.0
+  },
+  "slowniki": {
+   "type": {
+    "blockOfFlats": 8265,
+    "apartmentBuilding": 4505,
+    "tenement": 3824,
+    "<brak>": 3606
+   },
+   "ownership": {
+    "condominium": 18600,
+    "cooperative": 1600
+   },
+   "buildingMaterial": {
+    "brick": 9906,
+    "<brak>": 7787,
+    "concreteSlab": 2507
+   },
+   "condition": {
+    "<brak>": 14638,
+    "premium": 3718,
+    "low": 1844
+   }
+  }
+ }
+}

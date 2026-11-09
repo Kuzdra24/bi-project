@@ -1,0 +1,13 @@
+kategoria,liczba,node,way_rel,brak_nazwy_pct,duplikaty_nazwa_100m
+apteka,240,235,5,0.8,0
+las,2241,0,2241,98.9,0
+park,327,0,327,69.4,0
+peron_PT,1922,1863,59,0.8,498
+przedszkole,359,182,177,1.9,0
+przychodnia_lekarz,344,300,44,8.4,2
+przystanek_autobusowy,1542,1542,0,0.1,277
+przystanek_tramwajowy,465,465,0,0.0,123
+sklep_spozywczy,955,838,117,8.4,8
+stacja_kolejowa,30,30,0,0.0,0
+stop_position_PT,2037,2037,0,0.2,648
+szkola,376,204,172,6.4,0
