@@ -1,127 +1,283 @@
-# Rozpoznanie źródeł danych – raport do prezentacji
+# Rozpoznanie źródeł danych – raport
 
-Projekt BI, Grupa 6 – rynek mieszkaniowy: ceny ofertowe vs transakcyjne.
-Pomiar: 9.11.2026. Obszar próbki: **Wrocław (TERYT powiatu 0264)**. Okno czasowe: **VIII 2023 – VI 2024**.
-Kod: `src/*.py` (każdy skrypt uruchamia się poleceniem `uv run python src/<nazwa>.py`), próbki: `data/sample/`, wykresy: `reports/figures/`.
-
----
-
-## 0. Najważniejsze wnioski (na slajdy)
-
-1. **Luka ofertowa da się zmierzyć.** We Wrocławiu mediana ceny ofertowej to 12 414 zł/m², a transakcyjnej 10 912 zł/m², czyli **oferty są o ok. 14% droższe niż ceny faktycznych transakcji**. Luka jest największa dla małych mieszkań (<38 m²: +18%) i występuje w każdym miesiącu okna (wykresy 09, 10, 14).
-2. **Cztery źródła łączą się przez wspólne wymiary**: czas (miesiąc), obszar (TERYT + siatka 1 km), przedział powierzchni. NBP pokrywa 100% miesięcy, a 75% ofert leży w komórkach siatki, w których jest też ≥10 transakcji.
-3. **Wszystko jest sterowane kodem TERYT i datami** (`config.py`), bez nazw dzielnic, więc ten sam kod działa dla innego powiatu lub całej Polski.
-4. **Znaleźliśmy realne problemy, także w samych usługach źródłowych**: dwa błędy w usłudze WFS RCN, przeciążone Overpass API, regulaminy portali zakazujące scrapingu oraz wstępnie oczyszczony zbiór ofert.
-5. **Zmiana zakresu względem planu.** Planowany scraping ofert okazał się sprzeczny z regulaminami portali, więc użyliśmy otwartego zbioru Kaggle (Apache 2.0). Jego zakres (VIII 2023 – VI 2024) wyznaczył okno czasowe całego projektu.
+**Projekt BI, Grupa 6 – analiza rynku mieszkaniowego: ceny ofertowe vs ceny transakcyjne**
+Etap: weryfikacja źródeł danych (przed budową hurtowni). Stan na 9.11.2026.
 
 ---
 
-## R1. Źródła
+## Jak korzystać z tego dokumentu
 
-| Źródło | Co mierzy | Dostęp | Format | Licencja / warunki |
-|---|---|---|---|---|
-| **RCN** – Rejestr Cen Nieruchomości (GUGiK) | ceny **transakcyjne** (akty notarialne) | usługa WFS 2.0 `mapy.geoportal.gov.pl/wss/service/rcn`, bez rejestracji | **tylko GML** (bez GeoJSON i CSV), EPSG:2180 | nieodpłatnie po nowelizacji Prawa geodezyjnego i kartograficznego; ❓ dokładne warunki ponownego wykorzystania do potwierdzenia |
-| **Oferty** – Kaggle „Apartment Prices in Poland” (K. Jamroz) | ceny **ofertowe**, cechy mieszkań | pobranie ZIP przez API Kaggle (bez logowania) | CSV, 1 plik = 1 miesięczna migawka | **Apache 2.0**; ❓ autor nie podaje, z jakich portali pochodzą dane |
-| **OSM** – OpenStreetMap | otoczenie: komunikacja, zieleń, usługi | plik `.osm.pbf` z Geofabrik (dolnośląskie, 182 MB); alternatywnie Overpass API | PBF (binarny); Overpass: JSON | **ODbL 1.0**: wymagane „© OpenStreetMap contributors”, share-alike dla bazy pochodnej |
-| **NBP** – stopy procentowe | koszt pieniądza | pliki XML `static.nbp.pl/dane/stopy/` (bieżący + archiwum) | XML | dane publiczne; ❓ warunki ponownego wykorzystania nie zostały sprawdzone |
+Raport podsumowuje, co ustaliliśmy o naszych źródłach danych. Jest napisany tak, żeby dało się z niego bezpośrednio złożyć część prezentacji o **domenie i danych**.
 
-**Odrzucone: scraping portali ogłoszeniowych.** Regulaminy (odczyt 9.11.2026) zakazują automatycznego pobierania danych:
+- **Rozdział 1** – najważniejsze wnioski w pięciu zdaniach. Jeśli masz minutę, przeczytaj tylko ten rozdział.
+- **Rozdział 2** – **gotowy plan slajdów**: przy każdym slajdzie podajemy, co na nim pokazać, co powiedzieć i który wykres wkleić.
+- **Rozdziały 3–8** – szczegóły i uzasadnienia, gdyby ktoś zadał pytanie.
+- **Słowniczek** na końcu wyjaśnia skróty i pojęcia (RCN, TERYT, mediana itd.).
 
-| Portal | Zapis |
+Część o **architekturze rozwiązania** (przepływ danych, narzędzia, aktualizacja) jest w osobnym pliku `reports/ARCHITEKTURA.md`.
+
+Wszystkie wykresy są w folderze `reports/figures/`, mają numer w nazwie i są gotowe do wklejenia na slajd. Pełne liczby i szczegóły techniczne są w pliku `reports/RAPORT_techniczny.md`.
+
+---
+
+## 1. Najważniejsze w pięciu zdaniach
+
+1. **Oferty mieszkań są średnio o ok. 14% droższe niż ceny, za które mieszkania faktycznie się sprzedają.** We Wrocławiu (VIII 2023 – VI 2024) mediana ceny ofertowej wynosiła 12 414 zł/m², a transakcyjnej 10 912 zł/m². To pokazuje, że temat naszego projektu, czyli różnica między ceną z ogłoszenia a ceną z aktu notarialnego, ma pokrycie w danych.
+2. **Wszystkie cztery źródła da się ze sobą połączyć**: według miesiąca, miejsca i metrażu.
+3. **Wybór zakresu działa ogólnie.** Obszar wybieramy kodem TERYT, a nie nazwami dzielnic, więc ten sam kod zadziała dla innego miasta albo całej Polski.
+4. **W danych są realne problemy**, które opisaliśmy z przykładami, np. transakcja za 1 zł, ta sama sprzedaż zapisana dwa razy i błędy w samej usłudze rządowej.
+5. **Musieliśmy zmienić plan:** regulaminy portali ogłoszeniowych zabraniają pobierania danych automatem, więc oferty wzięliśmy z otwartego zbioru na licencji Apache 2.0. To ten zbiór wyznaczył okres analizy.
+
+---
+
+## 2. Proponowany plan slajdów
+
+Kolejność odpowiada wymaganiom z dokumentu „Wymagany zakres prezentacji” (część 1: domena i dane). Przy każdym slajdzie: **co pokazać**, **co powiedzieć** i **skąd wziąć liczby**.
+
+### Slajd 1 – Skąd bierzemy dane
+
+**Co pokazać:** tabelę czterech źródeł (poniżej), bez wykresu. Można dodać logo każdego źródła.
+
+| Pytanie | Źródło | Jak pobieramy | Format |
+|---|---|---|---|
+| Za ile **naprawdę** sprzedano? | **RCN** – Rejestr Cen Nieruchomości (Geoportal, GUGiK) | usługa internetowa WFS | GML (odmiana XML) |
+| Za ile **chcieli** sprzedać? | **Oferty** – zbiór Kaggle „Apartment Prices in Poland” | plik ZIP z CSV | CSV |
+| Co jest **w okolicy**? | **OpenStreetMap** (przez serwis Geofabrik) | plik z mapą województwa | PBF |
+| Jak **drogi był pieniądz**? | **NBP** – stopy procentowe | plik XML ze strony NBP | XML |
+
+**Co powiedzieć:**
+- Mamy cztery źródła w czterech różnych formatach, co spełnia wymóg „co najmniej dwóch źródeł”.
+- Wszystkie są darmowe i nie wymagają logowania.
+- Licencje: oferty – Apache 2.0, OpenStreetMap – ODbL (trzeba podpisać „© OpenStreetMap contributors”), RCN i NBP – dane publiczne.
+
+### Slajd 2 – Dlaczego nie scraping portali (zmiana planu)
+
+**Co pokazać:** cytat z regulaminu Otodom i krótką listę portali.
+
+> „Zabrania się w szczególności: a. jakiegokolwiek wykorzystywania tych treści bez pisemnej zgody uprawnionych; b. jakiegokolwiek agregowania i przetwarzania danych […] w celu ich dalszego udostępniania osobom trzecim […]”
+> – Regulamin Otodom (od 17.02.2024)
+
+| Portal | Czy pozwala pobierać dane automatem? |
 |---|---|
-| Otodom | „Zabrania się […] jakiegokolwiek wykorzystywania tych treści bez pisemnej zgody […]; jakiegokolwiek agregowania i przetwarzania danych […] w celu ich dalszego udostępniania osobom trzecim” |
-| Gratka | zakaz „zautomatyzowanych systemów […] do pozyskiwania danych […] do celów komercyjnych (tzw. screen scraping)” |
-| Nieruchomości-online (§14a) | zakaz pobierania „przy użyciu programów, skryptów, botów, crawlerów”; wyjątek: „nieistotna część” bazy (art. 7 ustawy o ochronie baz danych) |
-| Adresowo | zakaz „parsowania Serwisu przy użyciu botów”; korzystanie „wyłącznie na własny użytek” |
-| Domiporta | brak zapisu w regulaminie z 2022 r., ale `robots.txt` blokuje narzędzie `Scrapy` w całym serwisie |
-| Morizon | ❓ regulaminu nie udało się odczytać (link w stopce działa tylko w JavaScripcie) |
+| Otodom | nie – zakaz wykorzystywania treści bez zgody |
+| Gratka | nie – zakaz „screen scrapingu” |
+| Nieruchomości-online | nie – zakaz botów i crawlerów (wyjątek: „nieistotna część” bazy) |
+| Adresowo | nie – zakaz „parsowania przy użyciu botów” |
+| Domiporta | regulamin milczy, ale strona blokuje popularne narzędzie do scrapingu (Scrapy) |
 
-`robots.txt` Otodom nie blokuje ogłoszeń, ale nie jest to zgoda na wykorzystanie danych. ❓ Otwarte pytanie do prowadzącego: czy mała próbka badawcza (wyjątek z art. 7) jest akceptowalna.
+**Co powiedzieć:**
+- W pierwotnym planie oferty mieliśmy pobierać z portali. Zanim napisaliśmy jakikolwiek kod, sprawdziliśmy regulaminy, a cztery z pięciu odczytanych wprost tego zabraniają.
+- Dlatego użyliśmy gotowego, otwartego zbioru z Kaggle. Ma on jednak zamknięty okres (VIII 2023 – VI 2024) i to on wyznaczył okno czasowe całej analizy.
+- To dobry przykład realnego ryzyka projektu: dostępność danych to nie tylko kwestia techniczna, ale też prawna.
 
----
+### Slajd 3 – Ile mamy danych i jak często się zmieniają
 
-## R2. Charakterystyka: wolumen, zakres, częstotliwość zmian, aktualizacja
+**Co pokazać:** wykres `02_rcn_transakcje_miesiecznie.png` i tabelę poniżej.
 
-| | RCN | Oferty (Kaggle) | OSM | NBP |
+| | Transakcje (RCN) | Oferty (Kaggle) | Otoczenie (OSM) | Stopy (NBP) |
 |---|---|---|---|---|
-| Wolumen (Wrocław, okno) | **18 134 lokale**, w tym 14 521 mieszkalnych; ok. 54 MB GML | **20 200 wierszy** = 9 598 unikalnych ofert w 11 migawkach (1 542–2 313 / miesiąc); cała PL: 195 568 wierszy, 15 miast | 8 823 obiekty w 12 kategoriach (z pliku 182 MB dla województwa) | 96 zmian stóp od 1998 r. (37 KB) |
-| Zakres czasowy | dowolny (filtr po dacie aktu); dane z 2023 r. i wcześniejsze dostępne | **zamknięty: VIII 2023 – VI 2024** | stan bieżący (plik z 8.11.2026) | 1998-02-26 – 2026-03-05 |
-| Częstotliwość zmian | ciągła, z **opóźnieniem**: mediana 57 dni od aktu do wpisu (90% ≤ 118 dni) | brak dalszych aktualizacji | codzienne wydania Geofabrik | nieregularnie, po decyzjach RPP |
-| Aktualizacja w systemie | przyrostowo po `DOK_DATA`, ostatnie ~3 miesiące pobierać ponownie (dane spóźnione) | ładowanie jednorazowe; docelowo inne źródło ofert | pełne odświeżenie pliku raz na miesiąc lub kwartał | pobranie całego pliku przy zmianie |
+| Ile (Wrocław, VIII 2023 – VI 2024) | 18 134 lokale, z czego 14 521 mieszkań | 9 598 ofert (20 200 wierszy w 11 miesięcznych „migawkach”) | 8 823 obiekty (przystanki, parki, sklepy…) | 96 zmian stóp od 1998 r. |
+| Jak często się zmienia | na bieżąco, ale z opóźnieniem ok. 2 miesięcy | zbiór zamknięty, nie jest aktualizowany | codziennie | kilka razy w roku |
 
-**Aktualność RCN zmierzona na bieżącym oknie (XI 2024 – XI 2026, pierwszy przebieg):** ostatni akt w usłudze pochodzi z 28.09.2026; za X–XI 2026 nie ma ani jednego rekordu, a lipiec–wrzesień 2026 są wyraźnie niepełne (207 lokali we wrześniu wobec ~1 400 średnio). To dowód, że przy aktualizacji trzeba obsłużyć dane spóźnione.
+**Co powiedzieć:**
+- Na wykresie widać 1–2 tys. transakcji lokalami miesięcznie, więc danych jest wystarczająco dużo.
+- Ważna obserwacja o aktualności: gdy pobraliśmy dane za ostatnie dwa lata, **za październik i listopad 2026 w rejestrze nie było jeszcze ani jednej transakcji**, a wrzesień był prawie pusty. Akty notarialne trafiają do rejestru z opóźnieniem (mediana 57 dni, wykres `11_rcn_opoznienie_rejestracji.png`). Wniosek dla hurtowni: przy każdej aktualizacji trzeba ponownie pobierać ostatnie ~3 miesiące.
 
----
+### Slajd 4 – Jak łączymy źródła
 
-## R3. Integracja: relacje i klucze
+**Co pokazać:** schemat poniżej (można go przerysować) oraz wykres `08_osm_rcn_odleglosci.png` jako dowód, że połączenie działa.
 
-Oferta i transakcja to **różne zdarzenia bez wspólnego identyfikatora** (RCN jest anonimowy). Łączymy je przez wspólne wymiary.
+```
+ Oferty (Kaggle) ──┐                         ┌── NBP (stopy)
+                   │   wspólne wymiary:      │
+                   ├── • miesiąc ────────────┤
+                   │   • miasto (kod TERYT)
+                   │   • kwadrat siatki 1 km
+                   │   • przedział metrażu
+ Transakcje (RCN) ─┘            │
+                                └── współrzędne ── OpenStreetMap (otoczenie)
+```
 
-| Para | Klucz | Wynik testu na próbce |
+**Co powiedzieć:**
+- Oferta i transakcja to dwa różne zdarzenia. Nie da się powiedzieć, że „ta oferta skończyła się tą transakcją”, bo rejestr jest anonimowy. Porównujemy więc **grupy**: ten sam miesiąc, ten sam kwadrat 1×1 km, podobny metraż.
+- Wynik testu: wszystkie 11 miesięcy są wspólne dla obu źródeł, a **75% ofert** leży w kwadratach, w których jest też co najmniej 10 transakcji.
+- Stopy NBP dopinamy po miesiącu (100% pokrycia), a OpenStreetMap po współrzędnych. Np. połowa sprzedanych mieszkań ma przystanek bliżej niż 186 m.
+- Ważna decyzja projektowa: obszar wybieramy **kodem TERYT** (Wrocław = 0264), a nie listą dzielnic, więc projekt łatwo rozszerzyć na całą Polskę.
+
+### Slajd 5 – Jakość danych: kompletność
+
+**Co pokazać:** dwa wykresy obok siebie: `03_rcn_braki_pol.png` (transakcje) i `05_oferty_braki_pol.png` (oferty).
+
+**Co powiedzieć:**
+- **Transakcje (RCN):** najważniejsze pola, czyli cena, metraż, data, rodzaj rynku i lokalizacja, są wypełnione praktycznie w 100%. Braki dotyczą pól pobocznych (np. liczba izb 19%), a pola VAT są puste w całości.
+- **Oferty:** cena, metraż, pokoje i lokalizacja są pełne, ale **standard wykończenia brakuje w 72% ofert**, a materiału budynku w 38%.
+- Oferty **nie mają w ogóle** informacji, czy to rynek pierwotny czy wtórny, ani daty dodania ogłoszenia.
+
+### Slajd 6 – Problemy w danych na konkretnych przykładach
+
+**Co pokazać:** tabelę 5 problemów (to najciekawszy slajd dla prowadzącego, bo wymaganie mówi wprost o „rzeczywistych problemach na konkretnych przykładach”).
+
+| Problem | Przykład z danych | Co z tym robimy |
 |---|---|---|
-| RCN ↔ Oferty | **TERYT** (oferty: nazwa miasta → TERYT, słownik w `config.py`) + **miesiąc** + **komórka siatki 1 km** (EPSG:2180) + **przedział powierzchni** | 11/11 miesięcy wspólnych; 196 komórek z transakcjami, 206 z ofertami, **86 porównywalnych** (≥10 obserwacji po obu stronach), obejmujących **74,8% ofert** |
-| RCN ↔ NBP, Oferty ↔ NBP | miesiąc | **100%** miesięcy ma przypisaną stopę |
-| RCN ↔ OSM | współrzędne (EPSG:2180, odległość w metrach) | 4 420 unikalnych lokalizacji RCN; mediana odległości do przystanku 186 m, sklepu 213 m, parku 368 m, szkoły 430 m |
-| Oferty ↔ OSM | współrzędne | możliwe (oferty mają lat/lon); zbiór ma też gotowe odległości do POI liczone przez autora |
-| Granica obszaru | `teryt:terc` w OSM = `TERYT` w RCN | granica Wrocławia (relacja 451516, `admin_level=6`) znaleziona po samym kodzie |
+| Transakcje „nierynkowe” | mieszkania komunalne sprzedawane z bonifikatą po **1 525 zł/m²**; jedna transakcja za **1 zł** (84 m²) | odrzucamy z analizy cen rynkowych |
+| Ta sama sprzedaż zapisana dwa razy | ten sam lokal, ten sam dzień i cena 1 366 406 zł, dwa różne numery transakcji | usuwamy duplikaty (10 mieszkań) |
+| To samo mieszkanie pod różnymi ogłoszeniami | dwie oferty: ten sam punkt na mapie, 84 m², 7. piętro, 750 000 zł | usuwamy duplikaty (264 wiersze) |
+| „Izby” to nie „pokoje” | rejestr liczy też kuchnię (3 izby = ok. 54 m²), a portale podają pokoje | porównujemy po metrażu, nie po liczbie pokoi |
+| Błędy w samej usłudze rządowej | filtr „data **mniejsza niż** X” zwracał też dzień X, przez co rekordy się dublowały; prośba o współrzędne GPS była ignorowana | obejście w kodzie + test kontrolny sum |
+
+**Co powiedzieć:**
+- Każdy problem znaleźliśmy na prawdziwych rekordach i do każdego mamy plan: czyścimy, odrzucamy albo przenosimy do „kwarantanny”, czyli osobnej tabeli z podejrzanymi rekordami do sprawdzenia.
+- Na tym etapie reguły jakości to proste warunki w Pythonie (pandas). W hurtowni przeniesiemy je do **testów dbt** (np. `unique`, `not_null`, dozwolone wartości).
+
+### Slajd 7 – Pierwszy rzut oka na dane (rozkłady cen)
+
+**Co pokazać:** `01_rcn_cena_m2_hist.png` (transakcje) i `04_oferty_cena_m2_hist.png` (oferty).
+
+**Co powiedzieć:**
+- Transakcje: większość mieszkań we Wrocławiu sprzedawała się za 9–13 tys. zł/m².
+- Oferty: rozkład jest przesunięty w prawo, czyli oferty są droższe.
+- **Uwaga:** rozkład ofert jest „ucięty” od dołu (brak ofert poniżej ok. 8–9 tys. zł/m²). To znak, że autor zbioru wcześniej usunął część rekordów, a my nie znamy jego reguł. To ograniczenie, które trzeba uczciwie podać.
+
+### Slajd 8 – Pierwszy wynik: luka między ofertą a transakcją
+
+**Co pokazać:** **`09_oferta_vs_transakcja_powierzchnia.png`** (najważniejszy wykres), opcjonalnie `10_oferta_vs_transakcja_w_czasie.png` lub mapę `14_luka_siatka_1km.png`.
+
+**Co powiedzieć:**
+- W każdej grupie metrażu oferta jest droższa od transakcji, o 13–18%. Najwięcej przy kawalerkach (<38 m²: +18%).
+- Na wykresie w czasie widać, że luka utrzymuje się przez cały okres. Ceny ofertowe rosły równomiernie, a transakcyjne skokami.
+- Na mapie siatki widać, że luka różni się między częściami miasta: w niektórych kwadratach oferty są nawet tańsze niż transakcje, w innych droższe o ponad 30%.
+- Ten wynik to dowód, że dane pozwalają odpowiedzieć na nasze główne pytanie analityczne.
+
+### Slajd 9 – Otoczenie i stopy procentowe
+
+**Co pokazać:** `07_osm_obiekty_kategorie.png` i `06_nbp_stopa_referencyjna.png`.
+
+**Co powiedzieć:**
+- Z OpenStreetMap mamy 12 kategorii obiektów: przystanki, parki, lasy, sklepy, szkoły, przedszkola, przychodnie, apteki.
+- Ciekawostka jakościowa: ten sam przystanek bywa zapisany w OSM nawet trzy razy (inny typ punktu), więc ~6 tys. zapisów to w rzeczywistości ok. **1,6 tys. przystanków**.
+- Stopy NBP: w naszym okresie stopa referencyjna spadła z 6,75% do 5,75%, a potem stała w miejscu. To mało zmian, więc wnioski o wpływie stóp na ceny będą ostrożne.
+
+### Slajd 10 – Ograniczenia i co dalej
+
+**Co powiedzieć:**
+- Oferty są z lat 2023–2024, nie są aktualne. Pytamy prowadzącego, czy wolno nam pobrać małą próbkę z portalu do celów badawczych.
+- Oferty nie mają podziału na rynek pierwotny i wtórny, więc ten podział pokażemy tylko dla transakcji.
+- OpenStreetMap pokazuje dzisiejszą mapę, a transakcje są sprzed 2 lat (np. przystanek mógł powstać później).
+- Do sprawdzenia: dane NBP o oprocentowaniu kredytów oraz dokładne warunki licencyjne RCN i NBP.
 
 ---
 
-## R4. Czy dane wystarczą do wymagań informacyjnych
+## 3. Źródła danych – szczegóły
 
-| Grupa pytań (dokument „Użytkownik końcowy…”) | Pokrycie | Luki |
-|---|---|---|
-| **A. Ceny** – średnia/mediana ofertowa i transakcyjna, zestawienie oferta vs transakcja, dynamika, odchylenie oferty od podobnych | ✅ RCN: cena, powierzchnia, data, rynek, lokalizacja; oferty: cena, powierzchnia, pokoje, rok budowy, lokalizacja | **oferty nie mają rodzaju rynku** (pierwotny/wtórny), więc podział rynku działa tylko dla transakcji; okno ofert to tylko 11 miesięcy |
-| **B. Potencjał inwestycyjny** – lokalizacje, oferty niedowartościowane | ✅ pochodne z A i C: luka w komórce siatki / przedziale powierzchni; odchylenie oferty od mediany transakcji „podobnych” | brak danych o czynszach w RCN (Kaggle ma osobne pliki z ofertami wynajmu, niesprawdzone) |
-| **C. Lokalizacja i otoczenie** – komunikacja, zieleń, usługi, zależność z ceną | ✅ OSM: 12 kategorii, odległości i liczba obiektów w promieniu dla każdego punktu RCN | OSM to stan **bieżący**, a transakcje są z 2023–24 (infrastruktura mogła się zmienić) |
-| **D. Makroekonomia** – stopy vs ceny, okresy kosztu finansowania | ✅ NBP: pełna historia stóp, łączenie po miesiącu | w oknie tylko 2 zmiany stopy (6,75 → 6,00 → 5,75%), czyli mało zmienności; ❓ oprocentowanie kredytów (statystyka MIR NBP) niesprawdzone; dłuższą historię da RCN + NBP, ale nie oferty |
-| Wymiar „Nieruchomość” (metraż, pokoje, typ budynku, rok, standard) | metraż i pokoje ✅; typ budynku 82%, rok budowy 87% wypełnienia | standard (`condition`) **pusty w 72%** ofert; RCN ma **izby**, nie pokoje (patrz R6) |
+### 3.1 RCN – Rejestr Cen Nieruchomości (ceny transakcyjne)
+
+**Co to jest:** publiczny rejestr prowadzony przez starostwa. Trafia do niego każda sprzedaż nieruchomości na podstawie aktu notarialnego: cena, metraż, data, rodzaj rynku i położenie. Od niedawna dane są udostępniane bezpłatnie.
+
+**Jak pobraliśmy dane:** przez usługę internetową WFS na Geoportalu. Wysyłamy zapytanie typu „daj mi lokale z powiatu 0264 sprzedane w styczniu 2024”, a serwer zwraca plik GML (odmiana XML). Usługa umie też zwrócić **samą liczbę** pasujących rekordów, bez danych, co przydało się do szybkiego policzenia wolumenu.
+
+**Co jest w środku (najważniejsze pola):** cena transakcji i cena lokalu, metraż, liczba izb, piętro, data aktu, rodzaj rynku (pierwotny/wtórny), rodzaj transakcji (np. wolny rynek, bonifikata), kto sprzedaje i kto kupuje (np. osoba fizyczna, deweloper), adres, współrzędne.
+
+**Co zauważyliśmy:**
+- We Wrocławiu w okresie VIII 2023 – VI 2024 było 18 134 sprzedanych lokali: 80% to mieszkania, reszta to głównie garaże.
+- Sprzedaży na rynku pierwotnym było więcej niż na wtórnym (ok. 57% do 43% mieszkań).
+- Po odrzuceniu transakcji nierynkowych, sprzedaży udziałów i błędnych wartości zostaje **13 552 mieszkań** do analizy cen.
+- Jedno pole zawiera imię, nazwisko i adres notariusza. Usuwamy je od razu, bo nie jest nam potrzebne, a to dane osobowe.
+
+### 3.2 Oferty – zbiór Kaggle (ceny ofertowe)
+
+**Co to jest:** zbiór udostępniony na Kaggle przez Krzysztofa Jamroza, na licencji Apache 2.0. Zawiera oferty sprzedaży (i osobno wynajmu) mieszkań z 15 największych miast Polski, zbierane raz w miesiącu od sierpnia 2023 do czerwca 2024.
+
+**Jak pobraliśmy dane:** jednym poleceniem przez API Kaggle, bez logowania. Dostajemy ZIP z 19 plikami CSV (11 plików ze sprzedażą, 8 z wynajmem).
+
+**Co jest w środku:** cena, metraż, liczba pokoi, piętro i liczba pięter, rok budowy, typ budynku, materiał, standard, udogodnienia (balkon, winda, parking…), współrzędne oraz gotowe odległości do szkół, przychodni, aptek itd.
+
+**Co zauważyliśmy:**
+- Każdy plik to „migawka”, czyli stan ofert w danym miesiącu. Ta sama oferta może się pojawić w kilku migawkach: **połowa ofert występuje tylko raz**, a pojedyncze wiszą przez wszystkie 11 miesięcy (wykres `13_oferty_trwalosc_w_migawkach.png`).
+- **14% ofert zmienia cenę** między migawkami, zwykle o kilka procent (mediana 3,9%).
+- Autor nie podaje, z jakich portali zebrał dane. To ważna niewiadoma.
+- W jednym punkcie na mapie potrafi być nawet 168 ofert, więc lokalizacja jest często przybliżona (np. środek osiedla).
+
+### 3.3 OpenStreetMap (otoczenie)
+
+**Co to jest:** otwarta mapa świata tworzona przez społeczność, coś jak Wikipedia map. Każdy obiekt (przystanek, park, sklep) ma opis w formie tagów, np. `highway=bus_stop`.
+
+**Jak pobraliśmy dane:** najpierw próbowaliśmy usługi Overpass, która pozwala zapytać „daj mi wszystkie przystanki we Wrocławiu”. Okazała się **przeciążona**: odrzucała nawet najprostsze zapytania, a serwer sam pisze, że jest przeznaczony do użytku ręcznego. Przeszliśmy więc na **Geofabrik**, czyli gotowy plik z całą mapą województwa dolnośląskiego (182 MB). Nasz skrypt czyta go w niecałą minutę i wycina obszar Wrocławia po kodzie TERYT.
+
+**Co zauważyliśmy:**
+- Przystanki są opisane bardzo dokładnie (prawie wszystkie mają nazwy), parki i lasy znacznie słabiej (69% parków bez nazwy).
+- Jedna czwarta obiektów nie była edytowana od ponad 5 lat. Około tysiąca obiektów zmieniono jednocześnie mniej więcej 8 lat temu, co wygląda na jednorazowy import (wykres `12_osm_aktualnosc_edycji.png`).
+- W całym województwie tylko 2 obiekty miały uszkodzoną geometrię.
+
+### 3.4 NBP (stopy procentowe)
+
+**Co to jest:** oficjalne stopy procentowe NBP. Najważniejsza jest stopa referencyjna, od której zależy m.in. oprocentowanie kredytów hipotecznych.
+
+**Jak pobraliśmy dane:** dwa małe pliki XML ze strony NBP: aktualne stopy i pełna historia zmian od 1998 r.
+
+**Co zauważyliśmy:**
+- Dane są czyste: bez duplikatów i braków w naszym okresie.
+- Liczby zapisane są z **przecinkiem** (np. „5,75”), co trzeba przekonwertować.
+- Plik z historią ma w nagłówku datę publikacji z 2015 r., choć zawiera dane do 2026 r. Nie można więc na tej dacie polegać.
 
 ---
 
-## R5. Jakość danych
+## 4. Czy te dane wystarczą do naszych pytań analitycznych?
 
-| Wymiar | RCN | Oferty (Kaggle) | OSM | NBP |
-|---|---|---|---|---|
-| **Kompletność** | kluczowe pola pełne (cena, powierzchnia, data, rynek 100%); `LOK_LICZBA_IZB` brak 19%, `LOK_CENA_BRUTTO` 17%, `LOK_NR_KOND` 4%, adres 2%; pola VAT 100% puste | cena, metraż, pokoje, współrzędne 100%; `condition` brak 72%, `buildingMaterial` 38%, `type` 18%, `floor` 17%, `buildYear` 13% | współrzędne 100%; nazwy: przystanki <1% braków, parki 69%, lasy 99% | stopa referencyjna 100% w oknie; braki stóp depozytowej i dyskontowej przed 2001/2010 to brak strukturalny (stopy nie istniały) |
-| **Unikalność** | 0 duplikatów `gid`; **10 mieszkań** zarejestrowanych podwójnie (ten sam lokal, data i cena, różne ID transakcji); 177 „duplikatów” garaży to sprzedaż udziałów w hali garażowej (poprawne) | 0 duplikatów id w migawce; **264 wiersze** to „to samo mieszkanie pod innym id” (te same współrzędne, metraż, piętro i cena) | jeden przystanek zapisany jako `stop_position` + `platform` + `bus_stop`: 5 996 wierszy → 3 991 obiektów → **~1 582 przystanki** po deduplikacji (nazwa + 100 m) | 0 duplikatów |
-| **Spójność** | TERYT zgodny z ID lokalu w 100%; 3,1% mieszkań w transakcjach wielolokalowych (mieszkanie + garaż za jedną cenę) | 14,1% ofert zmienia cenę między migawkami (mediana zmiany 3,9%) | 4 030 wierszy to obiekty należące do kilku kategorii | archiwum = plik bieżący (5/5 stóp) |
-| **Poprawność formatów** | GML, daty ISO, słowniki camelCase | CSV, liczby z kropką, słowniki angielskie | PBF; 2 wadliwe multipoligony w całym województwie | **przecinek dziesiętny**, BOM UTF-8 |
-| **Poprawność wartości** | 117 mieszkań <3 000 zł/m² i 3 >50 000 zł/m² (0,8%); m.in. **cena 1 zł** za 84 m² | 0 wartości poza zakresem: **zbiór jest wstępnie oczyszczony** przez autora (1. percentyl 8 373 zł/m², ostra dolna krawędź rozkładu) | – | – |
-| **Aktualność** | opóźnienie wpisu: mediana 57 dni; ostatnie ~3 miesiące niepełne | zbiór zamrożony na VI 2024 | 26% obiektów nie edytowano od >5 lat; ~1 000 obiektów edytowanych ok. 8 lat temu (masowy import) | ⚠️ metadana `data_publikacji` w archiwum = 2015-03-04, choć dane sięgają 2026 |
-| **Integralność referencyjna** | 100% współrzędnych w PL; 0 dat poza filtrem; miejscowość w adresie = „Wrocław” w 14 481/14 521 | wszystkie oferty mają miasto ze słownika → TERYT | granica powiatu znaleziona po TERYT | 100% miesięcy RCN i ofert ma stopę |
+Odnosimy się do czterech grup pytań z dokumentu „Użytkownik końcowy i wymagania informacyjne”.
 
----
-
-## R6. Problemy i postępowanie
-
-| # | Problem | Konkretny przykład | Skala | Postępowanie |
-|---|---|---|---|---|
-| 1 | **Błąd usługi RCN:** filtr `PropertyIsLessThan` na dacie działa jak `<=` | filtr „< 2025-04-01” zwracał też akty z 1.04 → 54 zdublowane rekordy, suma miesięcy 29 680 zamiast 29 160 | każdy filtr zakresu dat | zakres jako [pierwszy, ostatni dzień] włącznie + **test kontrolny**: suma miesięcy = wynik dla całego okresu |
-| 2 | **Błąd usługi RCN:** parametr `SRSNAME=EPSG:4326` ignorowany | nagłówek deklaruje WGS84, współrzędne w PL-1992: `367505.19 353312.20` | wszystkie rekordy | przeliczenie we własnym zakresie (`pyproj`, EPSG:2180 → 4326) |
-| 3 | Transakcje niewolnorynkowe | sprzedaż z bonifikatą (mieszkania komunalne): mediana **1 525 zł/m²**; sprzedaż bezprzetargowa: 8 312 zł/m² | 5,1% mieszkań | **odrzucenie** z analiz cen rynkowych (`TRAN_RODZAJ_TRANS = wolnyRynek`) |
-| 4 | Sprzedaż udziałów | udział 71/1 000 000 za 7 600 zł | 1,4% mieszkań | **odrzucenie** (`NIER_UDZIAL = 1/1`) |
-| 5 | Cena transakcji obejmuje kilka lokali | mieszkanie + garaż: 600 000 zł za całość, 570 000 zł za mieszkanie | 3,1% mieszkań | cena z `LOK_CENA_BRUTTO`, a tylko gdy jej brak, z `TRAN_CENA_BRUTTO` |
-| 6 | Wartości błędne | `TRAN_CENA_BRUTTO = 1` zł za 84 m²; `LOK_CENA_BRUTTO = 903,29` przy cenie transakcji 903 290 zł (zła jednostka) | 120 mieszkań (0,8%) | **kwarantanna**: reguła cena/m² ∉ [3 000; 50 000] |
-| 7 | Podwójna rejestracja transakcji | ten sam lokal, 2023-10-17, 1 366 406 zł, dwa różne ID transakcji, wpisy z 27 i 28.11 | 10 mieszkań | **deduplikacja** po (lokal, data, cena) |
-| 8 | Izby ≠ pokoje | RCN liczy izby z kuchnią: mediana 1 izba = 32 m², 3 izby = 54 m² | semantyka pola | nie porównujemy z „pokojami” z ofert; do porównań używamy przedziałów powierzchni |
-| 9 | Dane osobowe w RCN | `DOK_TWORCA` = imię, nazwisko i adres notariusza | 100% | pole **usuwane przy ładowaniu** |
-| 10 | Oferty: to samo mieszkanie pod różnymi id | 2 oferty, ta sama pozycja (51.07905, 17.04037), 84 m², 7. piętro, 750 000 zł | 264 wiersze (1,3%) | **deduplikacja** po (migawka, współrzędne, metraż, piętro, cena) |
-| 11 | Oferty: przybliżona geolokalizacja | do **168 ofert** w jednym punkcie (prawdopodobnie środek ulicy lub osiedla) | część ofert | analizy przestrzenne na siatce 1 km, nie na poziomie budynku |
-| 12 | Oferty: zbiór wstępnie oczyszczony | 0 ofert poza zakresami; ucięta dolna część rozkładu (<~8–9 tys. zł/m²) | cały zbiór | opisać jako ograniczenie: luka może być **zaniżona lub zawyżona**, bo nie znamy reguł autora |
-| 13 | Oferty: brak rodzaju rynku i daty publikacji | rok budowy ≥ rok migawki tylko w 2,5% (słaby zamiennik rynku pierwotnego) | 100% | podział pierwotny/wtórny tylko po stronie RCN; czas oferty = miesiąc migawki |
-| 14 | OSM: wielokrotne zapisy przystanków | `stop_position` + `platform` + `bus_stop` dla tego samego przystanku | 5 996 → ~1 582 | deduplikacja (nazwa + 100 m); do liczenia odległości wystarczą surowe punkty |
-| 15 | OSM: wadliwe geometrie | relacje 21293193, 21570009 – multipoligon nie do złożenia | 2 w województwie | **odrzucenie** z logowaniem ID |
-| 16 | Overpass API przeciążone | HTTP 502 „at capacity, request queue is full” nawet dla zapytania `out count`; instancje zapasowe bez odpowiedzi | 9.11.2026 | przejście na pliki Geofabrik (ten sam OSM, ODbL); Overpass zostaje jako opcja do eksploracji |
-| 17 | NBP: nieaktualna metadana | `data_publikacji="2015-03-04"` w archiwum z danymi do 2026 | 1 atrybut | aktualizacja oparta na najnowszym `obowiazuje_od` |
-
-**Narzędzia kontroli jakości:** na tym etapie reguły w pandas (powyższe filtry, testy kontrolne liczności, deduplikacje, zakresy). Docelowo przenosimy je do **testów dbt** (`unique`, `not_null`, `accepted_values` dla słowników RCN, `relationships` dla kluczy TERYT/miesiąc) i/lub Great Expectations / Soda (zakresy cen, odsetek braków, test „suma miesięcy = total”). Rekordy z reguł kwarantanny trafiają do osobnej tabeli zamiast znikać.
+| Grupa pytań | Czy damy radę? | Na czym się opieramy | Czego brakuje |
+|---|---|---|---|
+| **A. Ceny** (średnie, mediany, oferta vs transakcja, zmiany w czasie) | **tak** | RCN + oferty | podział na rynek pierwotny/wtórny tylko dla transakcji; okres ofert to tylko 11 miesięcy |
+| **B. Potencjał inwestycyjny** (gdzie inwestować, oferty niedowartościowane) | **tak** | porównanie oferty z medianą podobnych transakcji w tym samym kwadracie i metrażu | dane o czynszach są w paczce Kaggle, ale jeszcze ich nie sprawdziliśmy |
+| **C. Lokalizacja i otoczenie** (przystanki, zieleń, usługi) | **tak** | OpenStreetMap + współrzędne transakcji i ofert | mapa jest „dzisiejsza”, transakcje sprzed 2 lat |
+| **D. Czynniki makro** (stopy vs ceny) | **częściowo** | NBP, połączenie po miesiącu | w naszym okresie stopy prawie się nie zmieniały; brak danych o oprocentowaniu kredytów |
 
 ---
 
-## R7. Dane surowe i przykładowe zapytania
+## 5. Jakość danych – podsumowanie
 
-**RCN – rekord GML (skrócony):**
+Ocenialiśmy sześć wymiarów jakości wymaganych w zadaniu. ✓ = dobrze, ~ = są problemy, ale do opanowania.
+
+| Wymiar | Co to znaczy | Transakcje (RCN) | Oferty | OSM | NBP |
+|---|---|---|---|---|---|
+| Kompletność | czy pola są wypełnione | ✓ kluczowe pola pełne | ~ standard brakuje w 72% | ~ parki bez nazw | ✓ |
+| Unikalność | czy nie ma duplikatów | ~ 10 zdublowanych sprzedaży | ~ 264 duplikaty ofert | ~ przystanki zapisane kilka razy | ✓ |
+| Spójność | czy dane nie przeczą sobie | ~ cena dla kilku lokali naraz (3%) | ✓ | ✓ | ✓ historia = stan bieżący |
+| Poprawność formatów | czy da się je wczytać | ~ tylko GML, błąd z układem współrzędnych | ✓ | ✓ | ~ przecinek dziesiętny |
+| Poprawność wartości | czy liczby mają sens | ~ 0,8% cen nierealnych (np. 1 zł) | ~ zbiór wstępnie „oczyszczony” przez autora | ✓ | ✓ |
+| Aktualność | czy dane są świeże | ~ opóźnienie ok. 2 miesięcy | ~ tylko do VI 2024 | ~ 26% obiektów nieedytowanych od 5 lat | ~ błędna data w nagłówku |
+
+---
+
+## 6. Pełna lista problemów i co z nimi robimy
+
+| # | Problem | Ile rekordów | Co robimy |
+|---|---|---|---|
+| 1 | Usługa RCN: filtr „mniejsze niż” na dacie działa jak „mniejsze lub równe” | dotyczy każdego zapytania o okres | obejście w kodzie + test: suma miesięcy musi się równać wynikowi dla całego okresu |
+| 2 | Usługa RCN ignoruje prośbę o współrzędne GPS | wszystkie rekordy | przeliczamy współrzędne sami |
+| 3 | Transakcje nierynkowe (bonifikata, sprzedaż bez przetargu) | 5,1% mieszkań | odrzucamy z analizy cen |
+| 4 | Sprzedaż części mieszkania (udziały, np. 1/6) | 1,4% mieszkań | odrzucamy |
+| 5 | Jedna cena za mieszkanie + garaż | 3,1% mieszkań | bierzemy cenę samego lokalu, jeśli jest podana |
+| 6 | Nierealne ceny (1 zł; cena wpisana w tysiącach) | 0,8% mieszkań | kwarantanna |
+| 7 | Ta sama sprzedaż zapisana dwa razy | 10 mieszkań | usuwamy duplikaty |
+| 8 | „Izby” w rejestrze ≠ „pokoje” w ofertach | całe pole | porównujemy po metrażu |
+| 9 | Dane osobowe notariusza w rejestrze | całe pole | usuwamy przy wczytaniu |
+| 10 | To samo mieszkanie w kilku ogłoszeniach | 264 wiersze ofert | usuwamy duplikaty |
+| 11 | Przybliżona lokalizacja ofert | część ofert | analizy na kwadratach 1 km, nie na budynkach |
+| 12 | Zbiór ofert wstępnie przefiltrowany przez autora | cały zbiór | opisujemy jako ograniczenie |
+| 13 | Brak rynku pierwotny/wtórny i daty ogłoszenia w ofertach | wszystkie oferty | podział rynku tylko dla transakcji |
+| 14 | Przystanki zapisane w OSM po kilka razy | ~6 000 zapisów → ~1 600 przystanków | łączymy po nazwie i odległości |
+| 15 | Uszkodzone geometrie w OSM | 2 obiekty | pomijamy i zapisujemy ich numery |
+| 16 | Przeciążona usługa Overpass | – | używamy pliku z Geofabrik |
+| 17 | Błędna data publikacji w pliku NBP | 1 pole | ignorujemy, bierzemy datę ostatniej zmiany stopy |
+
+**Narzędzia kontroli jakości:** teraz proste reguły w Pythonie (biblioteka pandas). W docelowym systemie te same reguły zapiszemy jako testy w **dbt** (np. „identyfikator musi być unikalny”, „cena nie może być pusta”, „rodzaj rynku musi mieć jedną z dozwolonych wartości”), ewentualnie w Great Expectations albo Soda. Podejrzane rekordy nie będą usuwane po cichu, tylko trafią do osobnej tabeli „kwarantanny”.
+
+---
+
+## 7. Przykłady surowych danych (do slajdu „techniczna prezentacja danych”)
+
+**Transakcja z RCN** (fragment pliku GML, czyli tak dane wyglądają „prosto z serwera”):
 ```xml
 <ms:lokale gml:id="lokale.13689671">
   <gml:Point srsName="urn:ogc:def:crs:EPSG::2180"><gml:pos>361084.63 361411.46</gml:pos></gml:Point>
@@ -132,72 +288,80 @@ Oferta i transakcja to **różne zdarzenia bez wspólnego identyfikatora** (RCN 
   <ms:DOK_DATA><gml:timePosition>2023-09-22</gml:timePosition></ms:DOK_DATA>
   <ms:LOK_FUNKCJA>mieszkalna</ms:LOK_FUNKCJA>
   <ms:LOK_LICZBA_IZB>3</ms:LOK_LICZBA_IZB>
-  <ms:LOK_NR_KOND>10</ms:LOK_NR_KOND>
   <ms:LOK_POW_UZYT>37</ms:LOK_POW_UZYT>
   <ms:LOK_ADRES>MSC:Wrocław;UL:Wincentego Stysia;NR_PORZ:20a</ms:LOK_ADRES>
 </ms:lokale>
 ```
-Zapytanie o liczbę rekordów (bez pobierania danych):
+Jak to czytać: mieszkanie 37 m², 3 izby, rynek wtórny, sprzedane 22.09.2023 za 400 000 zł (ok. 10 800 zł/m²).
+
+**Oferta z Kaggle** (jeden wiersz CSV, skrócony; przykład z innego miasta, ale format jest taki sam):
 ```
-GET mapy.geoportal.gov.pl/wss/service/rcn?SERVICE=WFS&VERSION=2.0.0&REQUEST=GetFeature
-    &TYPENAMES=ms:lokale&RESULTTYPE=hits
-    &FILTER=  TERYT = '0264' AND DOK_DATA >= '2024-01-01' AND DOK_DATA <= '2024-01-31' AND LOK_FUNKCJA = 'mieszkalna'
-→ numberMatched="1624"
+city,type,squareMeters,rooms,floor,buildYear,latitude,longitude,...,price
+szczecin,blockOfFlats,47.0,2.0,6.0,1981.0,53.4285438,14.5528116,...,449000
 ```
 
-**Oferty – wiersz CSV (`apartments_pl_2024_06.csv`, inne miasto, nagłówek skrócony):**
+**Ta sama oferta w kolejnych miesiącach** (widać obniżkę ceny):
 ```
-id,city,type,squareMeters,rooms,floor,floorCount,buildYear,latitude,longitude,centreDistance,poiCount,...,ownership,buildingMaterial,condition,...,price
-811891f98a870dfd6e414374a0a85560,szczecin,blockOfFlats,47.0,2.0,6.0,12.0,1981.0,53.4285438,14.5528116,0.79,67.0,...,condominium,concreteSlab,,...,449000
-```
-Ta sama oferta w kolejnych migawkach, ze zmianą ceny:
-```
-id 000967d7…  2024-02: 695 000 | 2024-03: 695 000 | 2024-04: 695 000 | 2024-05: 685 000 | 2024-06: 685 000  (53 m²)
+luty 2024: 695 000 zł → marzec: 695 000 → kwiecień: 695 000 → maj: 685 000 → czerwiec: 685 000   (53 m²)
 ```
 
-**OSM – wybór obszaru po TERYT (Overpass QL; ta sama logika w odczycie PBF):**
-```
-rel["boundary"="administrative"]["admin_level"="6"]["teryt:terc"="0264"]; map_to_area->.a;
-nwr["highway"="bus_stop"](area.a);
-```
-
-**NBP – fragment archiwum XML:**
+**Stopy NBP** (fragment XML; zwróć uwagę na przecinek w liczbach):
 ```xml
 <pozycje obowiazuje_od="2026-03-05">
     <pozycja id="ref" oprocentowanie="3,75" />
-    <pozycja id="lom" oprocentowanie="4,25" />
 </pozycje>
 ```
 
+**Przykładowe zapytanie do RCN** (zwraca samą liczbę rekordów):
+„Ile mieszkań sprzedano we Wrocławiu (TERYT 0264) w styczniu 2024?” → **1 624**
+
 ---
 
-## Wykresy (`reports/figures/`)
+## 8. Spis wykresów
 
-| Plik | Co pokazuje | Do slajdu |
+Wszystkie pliki są w `reports/figures/`. ★ = polecamy na slajd.
+
+| Plik | Co pokazuje | Slajd |
 |---|---|---|
-| `09_oferta_vs_transakcja_powierzchnia.png` | **główny wynik**: mediana ceny/m² oferta vs transakcja w 5 przedziałach powierzchni, luka +13…+18% | domena / sens projektu |
-| `10_oferta_vs_transakcja_w_czasie.png` | obie mediany miesięcznie + stopa NBP (łączenie po miesiącu) | integracja, makro |
-| `14_luka_siatka_1km.png` | mapa siatki 1 km: luka w 86 komórkach porównywalnych | integracja przestrzenna |
-| `01_rcn_cena_m2_hist.png` | rozkład ceny transakcyjnej/m² (RCN, po czyszczeniu) | eksploracja |
-| `02_rcn_transakcje_miesiecznie.png` | liczba transakcji miesięcznie (wszystkie vs mieszkalne) | wolumen |
-| `03_rcn_braki_pol.png` | kompletność pól RCN | jakość |
-| `11_rcn_opoznienie_rejestracji.png` | opóźnienie wpisu do RCN (mediana 57 dni) | aktualność |
-| `04_oferty_cena_m2_hist.png` | rozkład ceny ofertowej/m² (migawka VI 2024), widoczna ucięta dolna krawędź | eksploracja / problem 12 |
-| `05_oferty_braki_pol.png` | kompletność pól ofert (`condition` 72% braków) | jakość |
-| `13_oferty_trwalosc_w_migawkach.png` | w ilu migawkach pojawia się ta sama oferta | unikalność / snapshoty |
-| `06_nbp_stopa_referencyjna.png` | stopa referencyjna 2019–2026 z zaznaczonym oknem | makro |
-| `07_osm_obiekty_kategorie.png` | liczba obiektów OSM w 12 kategoriach | otoczenie |
-| `08_osm_rcn_odleglosci.png` | odległość mieszkanie → najbliższy przystanek/park/sklep/szkoła | integracja RCN ↔ OSM |
-| `12_osm_aktualnosc_edycji.png` | czas od ostatniej edycji obiektów OSM | aktualność OSM |
+| ★ `09_oferta_vs_transakcja_powierzchnia.png` | oferta vs transakcja według metrażu – **główny wynik** | 8 |
+| `10_oferta_vs_transakcja_w_czasie.png` | oferta vs transakcja miesiąc po miesiącu + stopa NBP | 8 |
+| `14_luka_siatka_1km.png` | mapa: gdzie oferty są droższe od transakcji, a gdzie tańsze | 8 |
+| ★ `02_rcn_transakcje_miesiecznie.png` | liczba transakcji w kolejnych miesiącach | 3 |
+| `11_rcn_opoznienie_rejestracji.png` | ile dni mija od aktu notarialnego do wpisu w rejestrze | 3 |
+| ★ `08_osm_rcn_odleglosci.png` | odległość od sprzedanego mieszkania do przystanku, parku, sklepu, szkoły | 4 |
+| ★ `03_rcn_braki_pol.png` | które pola w rejestrze są puste | 5 |
+| ★ `05_oferty_braki_pol.png` | które pola w ofertach są puste | 5 |
+| ★ `01_rcn_cena_m2_hist.png` | rozkład cen transakcyjnych za m² | 7 |
+| ★ `04_oferty_cena_m2_hist.png` | rozkład cen ofertowych za m² | 7 |
+| `13_oferty_trwalosc_w_migawkach.png` | jak długo oferty „wiszą” na rynku | (dodatkowy) |
+| ★ `07_osm_obiekty_kategorie.png` | ile jest przystanków, parków, sklepów itd. | 9 |
+| ★ `06_nbp_stopa_referencyjna.png` | stopa referencyjna NBP 2019–2026 | 9 |
+| `12_osm_aktualnosc_edycji.png` | jak dawno edytowano obiekty na mapie | (dodatkowy) |
 
 ---
 
-## Otwarte kwestie (❓)
+## Słowniczek
 
-- Prowadzący: czy mała próbka scrapingu (wyjątek z art. 7 ustawy o ochronie baz danych) jest akceptowalna. Od tego zależy źródło **aktualnych** ofert.
-- Warunki ponownego wykorzystania danych RCN i NBP (licencja formalna).
-- Statystyka oprocentowania kredytów mieszkaniowych NBP (MIR): niesprawdzona.
-- RCN `ms:budynki` (rok budowy?) i `ms:dzialki`: niesprawdzone.
-- Morizon: regulamin nieodczytany.
-- Kaggle: pliki z ofertami **wynajmu** (XI 2023 – VI 2024) są w paczce, ale nie zostały przeanalizowane.
-- Overpass API: ponowna próba w innym terminie (skrypt: `uv run python src/osm_sample.py overpass`).
+| Pojęcie | Wyjaśnienie |
+|---|---|
+| **RCN** | Rejestr Cen Nieruchomości – państwowa baza cen z aktów notarialnych |
+| **Geoportal / GUGiK** | rządowy portal map / Główny Urząd Geodezji i Kartografii, który go prowadzi |
+| **WFS** | standard usługi internetowej do pobierania danych mapowych (wysyłasz zapytanie, dostajesz dane) |
+| **GML** | format plików z danymi przestrzennymi, odmiana XML |
+| **TERYT** | urzędowy kod jednostki terytorialnej, np. **0264 = Wrocław** (jako powiat) |
+| **Kaggle** | serwis z darmowymi zbiorami danych |
+| **Migawka** | stan ofert z jednego miesiąca (jeden plik CSV = jedna migawka) |
+| **OSM / OpenStreetMap** | otwarta mapa świata tworzona przez społeczność |
+| **Geofabrik** | serwis udostępniający gotowe pliki z danymi OSM dla krajów i regionów |
+| **Overpass** | usługa do zadawania zapytań do OSM (u nas przeciążona) |
+| **PBF** | skompresowany format pliku z danymi OSM |
+| **Mediana** | wartość środkowa: połowa obserwacji jest niższa, połowa wyższa. Lepsza od średniej, bo nie psują jej skrajne ceny |
+| **Luka ofertowa** | o ile procent cena z ogłoszenia jest wyższa od ceny transakcyjnej |
+| **Siatka 1 km** | podział mapy na kwadraty 1×1 km. Pozwala porównywać miejsca bez używania nazw dzielnic |
+| **Kwarantanna** | osobna tabela na podejrzane rekordy: nie usuwamy ich, tylko odkładamy do sprawdzenia |
+| **dbt** | narzędzie do przekształcania danych w hurtowni i testowania ich jakości |
+| **Stopa referencyjna** | główna stopa procentowa NBP, wpływa na koszt kredytów |
+
+---
+
+*Kod źródłowy: folder `src/` (każdy skrypt uruchamia się poleceniem `uv run python src/<nazwa>.py`). Próbki danych: `data/sample/`. Szczegóły techniczne i pełne liczby: `reports/RAPORT_techniczny.md`.*
