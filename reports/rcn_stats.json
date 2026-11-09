@@ -1,0 +1,93 @@
+{
+ "teryt": [
+  "0264"
+ ],
+ "zakres": [
+  "2024-11-01",
+  "2026-11-09"
+ ],
+ "n_probka": 3450,
+ "n_wszystkie_w_zakresie": 29160,
+ "n_mieszkalne_w_zakresie": 24345,
+ "braki_pct": {
+  "NIER_POW_GRUNTU": 100.0,
+  "LOK_VAT": 100.0,
+  "NIER_VAT": 100.0,
+  "TRAN_VAT": 100.0,
+  "SERWIS_RCN": 100.0,
+  "NIER_OPIS": 96.7,
+  "LOK_INFO": 92.6,
+  "LOK_POW_PRZYN": 80.6,
+  "LOK_CENA_BRUTTO": 19.2,
+  "LOK_LICZBA_IZB": 18.1,
+  "LOK_NR_KOND": 4.0,
+  "LOK_ADRES": 1.5,
+  "NIER_CENA_BRUTTO": 1.2
+ },
+ "rozklad_LOK_FUNKCJA": {
+  "mieszkalna": 2844,
+  "garaz": 433,
+  "inna": 158,
+  "handlowoUslugowa": 11,
+  "biurowa": 3,
+  "<brak>": 1
+ },
+ "rozklad_TRAN_RODZAJ_TRANS": {
+  "wolnyRynek": 3263,
+  "sprzedazZBonifikata": 100,
+  "sprzedazBezprzetargowa": 73,
+  "sprzedazPrzetargowa": 11,
+  "sprzedazWPostepowaniuEgzekucyjnym": 2,
+  "sprzedazNaCelPubliczny": 1
+ },
+ "rozklad_TRAN_RODZAJ_RYNKU": {
+  "rynekWtorny": 1953,
+  "rynekPierwotny": 1497
+ },
+ "rozklad_TRAN_SPRZEDAJACY": {
+  "osobaFizyczna": 1837,
+  "osobaPrawna": 1436,
+  "jednostkaSamorzaduTerytorialnego": 175,
+  "skarbPanstwa": 2
+ },
+ "rozklad_TRAN_KUPUJACY": {
+  "osobaFizyczna": 3286,
+  "osobaPrawna": 160,
+  "jednostkaSamorzaduTerytorialnego": 4
+ },
+ "rozklad_NIER_PRAWO": {
+  "wlasnoscLokaluWrazZPrawemZwiazanym": 3450
+ },
+ "rozklad_NIER_RODZAJ": {
+  "nieruchomoscLokalowa": 3450
+ },
+ "mieszkalne_w_probce": 2844,
+ "udzial_nie_1_1_pct": 2.4,
+ "transakcje_wielolokalowe_pct": 5.9,
+ "cena_z_LOK_CENA_pct": 88.7,
+ "brak_rynku_pct": 0.0,
+ "duplikaty_lokal_data_cena": 4,
+ "duplikaty_gid": 0,
+ "teryt_niezgodny_z_id_lokalu": 0,
+ "wspolrzedne_poza_PL": 0,
+ "data_poza_zakresem": 0,
+ "pow_uzyt_podejrzana(<15 lub >250 m2)": 1,
+ "cena_m2_podejrzana(<3000 lub >50000)": 122,
+ "cena_m2_kwantyle": {
+  "0.01": 1212.0,
+  "0.25": 10390.0,
+  "0.5": 12301.0,
+  "0.75": 14343.0,
+  "0.99": 23325.0
+ },
+ "opoznienie_rejestracji_dni_kwantyle": {
+  "0.1": 20.0,
+  "0.5": 39.0,
+  "0.9": 82.0
+ },
+ "czyste_rekordy": 2586,
+ "czyste_mediana_cena_m2_wg_rynku": {
+  "rynekPierwotny": 12811.0,
+  "rynekWtorny": 12618.0
+ }
+}
